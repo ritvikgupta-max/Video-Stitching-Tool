@@ -18,7 +18,7 @@ export const renderVideo = async (
       try {
         ffmpeg.terminate();
       } catch (e) {
-        console.error('Error terminating FFmpeg:', e);
+        console.error('Failed to terminate ffmpeg', e);
       }
     });
   }
@@ -36,29 +36,12 @@ export const renderVideo = async (
     }
   });
 
+  const baseURL = 'https://unpkg.com/@ffmpeg/core@0.12.6/dist/esm';
   onProgress(0, 'Loading FFmpeg...');
-  
-  try {
- console.log('Loading ffmpeg...');
-onProgress(0, 'Initializing FFmpeg...');
-
-await ffmpeg.load({
-  coreURL: await toBlobURL(
-    'https://unpkg.com/@ffmpeg/core@0.12.6/dist/umd/ffmpeg-core.js',
-    'text/javascript'
-  ),
-  wasmURL: await toBlobURL(
-    'https://unpkg.com/@ffmpeg/core@0.12.6/dist/umd/ffmpeg-core.wasm',
-    'application/wasm'
-  ),
-    }, { signal });
-    console.log('FFmpeg loaded successfully');
-  } catch (e) {
-    console.error('Failed to load FFmpeg:', e);
-    throw new Error(`Failed to load FFmpeg: ${e instanceof Error ? e.message : String(e)}`);
-  }
-
-  if (signal?.aborted) throw new Error('Render cancelled');
+  await ffmpeg.load({
+    coreURL: await toBlobURL(`${baseURL}/ffmpeg-core.js`, 'text/javascript'),
+    wasmURL: await toBlobURL(`${baseURL}/ffmpeg-core.wasm`, 'application/wasm'),
+  });
 
   const validClips = clips.filter(c => c.url && c.url.trim() !== '');
   const validAudioTracks = audioTracks.filter(t => t.url && t.url.trim() !== '');
@@ -66,13 +49,11 @@ await ffmpeg.load({
   onProgress(0, 'Fetching media...');
   // Write files to FFmpeg FS
   for (let i = 0; i < validClips.length; i++) {
-    if (signal?.aborted) throw new Error('Render cancelled');
     const clip = validClips[i];
     await ffmpeg.writeFile(`clip_${i}.mp4`, await fetchFile(clip.url));
   }
 
   for (let i = 0; i < validAudioTracks.length; i++) {
-    if (signal?.aborted) throw new Error('Render cancelled');
     const track = validAudioTracks[i];
     await ffmpeg.writeFile(`audio_${i}.mp3`, await fetchFile(track.url));
   }
@@ -184,11 +165,21 @@ await ffmpeg.load({
     'output.mp4'
   ];
 
-  const ret = await ffmpeg.exec(args, undefined, { signal });
-  if (ret !== 0) {
-    throw new Error(`FFmpeg exited with code ${ret}`);
-  }
+  try {
+    const ret = await ffmpeg.exec(args);
+    if (ret !== 0) {
+      if (signal?.aborted) {
+        throw new Error('Render cancelled by user');
+      }
+      throw new Error(`FFmpeg exited with code ${ret}`);
+    }
 
-  const data = await ffmpeg.readFile('output.mp4');
-  return new Blob([(data as Uint8Array).buffer], { type: 'video/mp4' });
+    const data = await ffmpeg.readFile('output.mp4');
+    return new Blob([(data as Uint8Array).buffer], { type: 'video/mp4' });
+  } catch (error) {
+    if (signal?.aborted) {
+      throw new Error('Render cancelled by user');
+    }
+    throw error;
+  }
 };

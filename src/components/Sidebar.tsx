@@ -85,7 +85,7 @@ export const Sidebar: React.FC = () => {
     const files = e.target.files;
     if (!files || files.length === 0) return;
     
-    Array.from(files).forEach((file, index) => {
+    Array.from(files).forEach((file: File, index) => {
       const url = URL.createObjectURL(file);
       const video = document.createElement('video');
       video.preload = 'metadata';
@@ -112,7 +112,7 @@ export const Sidebar: React.FC = () => {
     const files = e.target.files;
     if (!files || files.length === 0) return;
     
-    Array.from(files).forEach((file, index) => {
+    Array.from(files).forEach((file: File, index) => {
       const url = URL.createObjectURL(file);
       const audioEl = document.createElement('audio');
       audioEl.preload = 'metadata';

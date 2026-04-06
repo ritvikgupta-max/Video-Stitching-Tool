@@ -6,6 +6,7 @@ import { renderVideo } from '../lib/ffmpeg';
 export const Header: React.FC = () => {
   const { clips, texts, transitions, audioTracks, settings, setSelection, totalDuration } = useProject();
   const [isExporting, setIsExporting] = useState(false);
+  const [isRendering, setIsRendering] = useState(false);
   const [renderProgress, setRenderProgress] = useState(0);
   const [renderStatus, setRenderStatus] = useState('');
   const abortControllerRef = useRef<AbortController | null>(null);
@@ -35,24 +36,18 @@ export const Header: React.FC = () => {
     }, 1500);
   };
 
-  const handleCancelRender = () => {
-    if (abortControllerRef.current) {
-      abortControllerRef.current.abort();
-      abortControllerRef.current = null;
-    }
-  };
-
   const handleRender = async () => {
     if (clips.length === 0) {
       alert('Please add at least one video clip before rendering.');
       return;
     }
 
-    setIsExporting(true);
+    const controller = new AbortController();
+    abortControllerRef.current = controller;
+
+    setIsRendering(true);
     setRenderProgress(0);
     setRenderStatus('Initializing...');
-    
-    abortControllerRef.current = new AbortController();
 
     try {
       const blob = await renderVideo(
@@ -65,7 +60,7 @@ export const Header: React.FC = () => {
           if (status) setRenderStatus(status);
           if (progress >= 0) setRenderProgress(Math.round(progress * 100));
         },
-        abortControllerRef.current.signal
+        controller.signal
       );
 
       setRenderStatus('Done!');
@@ -78,17 +73,23 @@ export const Header: React.FC = () => {
       document.body.removeChild(a);
       URL.revokeObjectURL(url);
     } catch (error) {
-      console.error('Render failed:', error);
-      if (error instanceof Error && error.message === 'Render cancelled') {
-        alert('Rendering was cancelled.');
+      if (controller.signal.aborted) {
+        console.log('Render cancelled');
       } else {
+        console.error('Render failed:', error);
         alert(`Render failed: ${error instanceof Error ? error.message : String(error)}`);
       }
     } finally {
-      setIsExporting(false);
+      setIsRendering(false);
       setRenderProgress(0);
       setRenderStatus('');
       abortControllerRef.current = null;
+    }
+  };
+
+  const handleCancelRender = () => {
+    if (abortControllerRef.current) {
+      abortControllerRef.current.abort();
     }
   };
 
@@ -111,38 +112,36 @@ export const Header: React.FC = () => {
         </button>
         <button 
           onClick={handleExport}
-          className="flex items-center gap-2 bg-[#333] hover:bg-[#444] text-white px-4 py-1.5 rounded-md text-sm font-medium transition-colors"
+          disabled={isExporting || isRendering}
+          className="flex items-center gap-2 bg-[#333] hover:bg-[#444] disabled:opacity-50 text-white px-4 py-1.5 rounded-md text-sm font-medium transition-colors"
         >
           <Download size={16} />
-          Export JSON
+          {isExporting ? 'Exporting...' : 'Export JSON'}
         </button>
-        {isExporting && (
-          <button
-            onClick={handleCancelRender}
-            className="flex items-center gap-2 bg-red-600 hover:bg-red-700 text-white px-4 py-1.5 rounded-md text-sm font-medium transition-colors"
-            title="Cancel Rendering"
-          >
-            <X size={16} />
-            Cancel
-          </button>
-        )}
-        <button 
-          onClick={handleRender}
-          disabled={isExporting}
-          className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 disabled:bg-blue-800 text-white px-4 py-1.5 rounded-md text-sm font-medium transition-colors min-w-[140px] justify-center"
-        >
-          {isExporting ? (
-            <>
+        {isRendering ? (
+          <div className="flex items-center">
+            <div className="flex items-center gap-2 bg-blue-800 text-white px-4 py-1.5 rounded-l-md text-sm font-medium min-w-[140px] justify-center">
               <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
               <span>{renderStatus} {renderProgress}%</span>
-            </>
-          ) : (
-            <>
-              <Play size={16} />
-              <span>Render Video</span>
-            </>
-          )}
-        </button>
+            </div>
+            <button
+              onClick={handleCancelRender}
+              className="flex items-center justify-center bg-red-600 hover:bg-red-700 text-white px-3 py-1.5 rounded-r-md transition-colors"
+              title="Cancel Render"
+            >
+              <X size={16} />
+            </button>
+          </div>
+        ) : (
+          <button 
+            onClick={handleRender}
+            disabled={isExporting}
+            className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white px-4 py-1.5 rounded-md text-sm font-medium transition-colors min-w-[140px] justify-center"
+          >
+            <Play size={16} />
+            <span>Render Video</span>
+          </button>
+        )}
       </div>
     </header>
   );

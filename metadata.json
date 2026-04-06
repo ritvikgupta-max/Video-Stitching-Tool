@@ -1,5 +1,5 @@
 {
-  "name": "Video Stitching Tool",
+  "name": "Video Creation Tool",
   "description": "This tool helps in stitching together video snippets, add text, add transitions and add audio files",
   "requestFramePermissions": []
 }
