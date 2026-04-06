@@ -39,14 +39,18 @@ export const renderVideo = async (
   onProgress(0, 'Loading FFmpeg...');
   
   try {
-    let baseURL = 'https://unpkg.com/@ffmpeg/core@0.12.6/dist/umd';
-    
-    console.log('Loading ffmpeg...');
-    onProgress(0, 'Initializing FFmpeg...');
+ console.log('Loading ffmpeg...');
+onProgress(0, 'Initializing FFmpeg...');
 
-    await ffmpeg.load({
-      coreURL: `${baseURL}/ffmpeg-core.js`,
-      wasmURL: `${baseURL}/ffmpeg-core.wasm`,
+await ffmpeg.load({
+  coreURL: await toBlobURL(
+    'https://unpkg.com/@ffmpeg/core@0.12.6/dist/umd/ffmpeg-core.js',
+    'text/javascript'
+  ),
+  wasmURL: await toBlobURL(
+    'https://unpkg.com/@ffmpeg/core@0.12.6/dist/umd/ffmpeg-core.wasm',
+    'application/wasm'
+  ),
     }, { signal });
     console.log('FFmpeg loaded successfully');
   } catch (e) {
